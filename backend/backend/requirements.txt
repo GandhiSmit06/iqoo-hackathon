@@ -1,0 +1,39 @@
+# ============================================================
+# ProtoPatch Backend Dependencies
+# Python 3.12 | Django | DRF | Gemini | Whisper | Tree-sitter
+# ============================================================
+
+# --- Web Framework ---
+django>=6.1
+djangorestframework>=3.18.0
+django-cors-headers>=4.9.0
+python-dotenv>=1.2.3
+gunicorn>=22.0.0
+
+# --- File Handling ---
+Pillow==10.4.0
+python-magic-bin==0.4.14; sys_platform == "win32"
+python-magic==0.4.27; sys_platform != "win32"
+
+# --- Google Gemini VLM ---
+google-generativeai==0.7.2
+
+# --- Speech-to-Text (local, CPU, no GPU required) ---
+faster-whisper==1.0.3
+pydub==0.25.1
+
+# --- AST & Code Analysis ---
+tree-sitter==0.23.1
+tree-sitter-languages==1.10.2
+
+# --- Git Automation ---
+PyGithub==2.3.0
+dulwich==0.21.7
+
+# --- HTML Sanitization ---
+bleach==6.1.0
+
+# --- Utilities ---
+requests==2.32.3
+jinja2==3.1.4
+typing-extensions==4.12.2

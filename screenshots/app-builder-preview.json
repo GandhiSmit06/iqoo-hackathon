@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "ProtoPatch",
+      "hasCanvas": false,
+      "bodyTextLen": 3174,
+      "bodyTextHash": "e776a0b6e0c490edec369c62fcf007897d107fa610849a8a53cd5b8fbf0cee42",
+      "bodyTextPrefix": "PROTO.PATCH. 01 OVERVIEW 02 SKETCH2STACK 03 SCREENTOPATCH 04 ARC",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "ProtoPatch",
+      "hasCanvas": false,
+      "bodyTextLen": 3001,
+      "bodyTextHash": "7b7b1dfceacfcf9a1ce1843021ba58aea6ced54e69b074354e3a98321fce6633",
+      "bodyTextPrefix": "PROTO.PATCH. SKETCH2STACK SCREENTOPATCH IQOO HACKATHON FROM NAPK",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
