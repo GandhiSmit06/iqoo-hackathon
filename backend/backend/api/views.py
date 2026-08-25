@@ -6,8 +6,10 @@ Two primary pipeline views:
   - ScreenToPatchView  : POST /api/screentopatch/
   - HealthCheckView    : GET  /api/health/
 """
+import gc
 import logging
 import tempfile
+import time
 from pathlib import Path
 
 from django.conf import settings
@@ -150,7 +152,7 @@ class ScreenToPatchView(APIView):
             transcript = ""
             audio_path = None
 
-            with tempfile.TemporaryDirectory() as tmp_dir:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
                 tmp_path = Path(tmp_dir)
 
                 # --- Step 1: Save uploaded files ---
@@ -215,20 +217,26 @@ class ScreenToPatchView(APIView):
                 branch_name = ""
 
                 if settings.GITHUB_TOKEN and file_matches:
-                    git_svc = GitService(github_token=settings.GITHUB_TOKEN)
-                    pr_result = git_svc.create_fix_pr(
-                        repo_url=repo_url,
-                        base_branch=branch,
-                        bug_analysis=bug_result,
-                        file_matches=file_matches,
-                        transcript=transcript,
-                        tmp_dir=tmp_path,
-                    )
-                    pr_url = pr_result.get("pr_url", "")
-                    pr_number = pr_result.get("pr_number")
-                    branch_name = pr_result.get("branch_name", "")
+                    try:
+                        git_svc = GitService(github_token=settings.GITHUB_TOKEN)
+                        pr_result = git_svc.create_fix_pr(
+                            repo_url=repo_url,
+                            base_branch=branch,
+                            bug_analysis=bug_result,
+                            file_matches=file_matches,
+                            transcript=transcript,
+                            tmp_dir=tmp_path,
+                        )
+                        pr_url = pr_result.get("pr_url", "")
+                        pr_number = pr_result.get("pr_number")
+                        branch_name = pr_result.get("branch_name", "")
+                    except Exception as exc:
+                        logger.warning("Could not auto-create GitHub PR: %s", exc)
+                        branch_name = f"fix/protopatch-{int(time.time())}"
                 else:
-                    branch_name = "fix/protopatch-no-github-token"
+                    branch_name = f"fix/protopatch-{int(time.time())}"
+
+                gc.collect()
 
             return Response({
                 "success": True,

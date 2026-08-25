@@ -78,27 +78,44 @@ class ASTEngine:
         self._ts_parsers: dict = {}
 
     def _clone_repo(self, repo_url: str, target_dir: Path) -> Path:
-        """Clone repo shallowly using dulwich."""
+        """Clone repo shallowly using dulwich or zip download."""
         clone_path = target_dir / "repo"
-        if clone_path.exists():
-            shutil.rmtree(clone_path)
-        clone_path.mkdir(parents=True)
+        self._safe_rmtree(clone_path)
+        clone_path.mkdir(parents=True, exist_ok=True)
 
         try:
             from dulwich import porcelain
             logger.info("Cloning repo: %s → %s", repo_url, clone_path)
-            porcelain.clone(
+            repo = porcelain.clone(
                 repo_url,
                 str(clone_path),
                 depth=1,
                 errstream=open(os.devnull, "wb"),
             )
+            if hasattr(repo, "close"):
+                repo.close()
             logger.info("Clone complete")
         except Exception as exc:
             logger.warning("dulwich clone failed: %s — attempting requests-based download", exc)
             self._download_repo_zip(repo_url, clone_path)
 
         return clone_path
+
+    def _safe_rmtree(self, path: Path):
+        """Safely delete directory handling Windows read-only git pack files."""
+        import stat
+        if not path.exists():
+            return
+        def onerror(func, p, exc_info):
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                func(p)
+            except Exception:
+                pass
+        try:
+            shutil.rmtree(str(path), onerror=onerror)
+        except Exception as e:
+            logger.debug("safe_rmtree error: %s", e)
 
     def _download_repo_zip(self, repo_url: str, target_dir: Path):
         """Fallback: download GitHub zip archive."""
@@ -133,6 +150,9 @@ class ASTEngine:
             parser = get_parser(language)
             self._ts_parsers[language] = parser
             return parser
+        except ImportError:
+            logger.debug("tree-sitter-languages not available — using regex fallback for %s", language)
+            return None
         except Exception as exc:
             logger.debug("tree-sitter parser unavailable for %s: %s", language, exc)
             return None

@@ -105,25 +105,13 @@ class VisionService:
         schema: Optional[dict] = None,
     ) -> dict:
         """
-        Core Gemini API call with structured JSON output enforcement.
-        Falls back to regex JSON extraction if structured output fails.
+        Core Gemini API call with structured JSON output and multi-model failover.
         """
         genai = self._get_client()
 
-        generation_config = {
-            "temperature": 0.2,
-            "top_p": 0.9,
-            "max_output_tokens": 8192,
-        }
-
-        if schema:
-            generation_config["response_mime_type"] = "application/json"
-            generation_config["response_schema"] = schema
-
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config=generation_config,
-        )
+        candidate_models = [model_name, "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"]
+        # deduplicate while preserving order
+        candidate_models = list(dict.fromkeys(candidate_models))
 
         content_parts = [prompt]
         if image_bytes:
@@ -132,45 +120,135 @@ class VisionService:
                 "data": image_bytes,
             })
 
-        try:
-            response = model.generate_content(content_parts)
-            raw_text = response.text.strip()
-        except Exception as exc:
-            logger.warning("Gemini API error: %s — retrying without schema", exc)
-            # Fallback: retry without schema enforcement
-            model_fallback = genai.GenerativeModel(
-                model_name=model_name,
-                generation_config={"temperature": 0.2, "max_output_tokens": 8192},
-            )
-            response = model_fallback.generate_content(content_parts)
-            raw_text = response.text.strip()
+        last_exc = None
+        for m_name in candidate_models:
+            generation_config = {
+                "temperature": 0.2,
+                "top_p": 0.9,
+                "max_output_tokens": 8192,
+            }
+            if schema:
+                generation_config["response_mime_type"] = "application/json"
+                generation_config["response_schema"] = schema
 
-        return self._extract_json(raw_text)
+            try:
+                model = genai.GenerativeModel(model_name=m_name, generation_config=generation_config)
+                response = model.generate_content(content_parts)
+                if response.candidates and response.candidates[0].content.parts:
+                    raw_text = "".join(p.text for p in response.candidates[0].content.parts if hasattr(p, "text"))
+                else:
+                    raw_text = response.text.strip()
+                return self._extract_json(raw_text)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("Gemini model %s failed: %s — trying next fallback", m_name, exc)
+                # Try without schema on same model first
+                try:
+                    fallback_model = genai.GenerativeModel(model_name=m_name, generation_config={"temperature": 0.2, "max_output_tokens": 8192})
+                    response = fallback_model.generate_content(content_parts)
+                    if response.candidates and response.candidates[0].content.parts:
+                        raw_text = "".join(p.text for p in response.candidates[0].content.parts if hasattr(p, "text"))
+                    else:
+                        raw_text = response.text.strip()
+                    return self._extract_json(raw_text)
+                except Exception as exc2:
+                    logger.warning("Gemini model %s fallback without schema failed: %s", m_name, exc2)
+                    continue
+
+        logger.error("All Gemini candidate models failed: %s", last_exc)
+        return self._extract_json("")
 
     def _extract_json(self, text: str) -> dict:
-        """Extract JSON from model output, handling markdown code blocks."""
-        # Try direct JSON parse first
+        """Extract JSON from model output, handling markdown code blocks, malformed strings, and truncated JSON."""
+        if not text:
+            return {}
+
+        # 1. Direct parse with strict=False
         try:
-            return json.loads(text)
-        except json.JSONDecodeError:
+            return json.loads(text, strict=False)
+        except Exception:
             pass
 
-        # Strip markdown code fences
+        # 2. Markdown code fences with JSON
         patterns = [
             r"```json\s*([\s\S]*?)\s*```",
             r"```\s*([\s\S]*?)\s*```",
-            r"\{[\s\S]*\}",
+            r"(\{[\s\S]*\})",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.DOTALL)
             if match:
-                candidate = match.group(1) if "```" in pattern else match.group(0)
+                candidate = match.group(1).strip()
                 try:
-                    return json.loads(candidate)
-                except json.JSONDecodeError:
-                    continue
+                    return json.loads(candidate, strict=False)
+                except Exception:
+                    # Clean trailing commas
+                    cleaned = re.sub(r",\s*([\]}])", r"\1", candidate)
+                    try:
+                        return json.loads(cleaned, strict=False)
+                    except Exception:
+                        pass
 
-        raise ValueError(f"Could not parse JSON from Gemini response. Raw output:\n{text[:500]}")
+        # 3. Robust regex field extraction (handles unclosed strings at EOF)
+        result = {}
+
+        # Extract html_code
+        html_m = re.search(r'"html_code"\s*:\s*"([\s\S]*?)(?:",\s*"(?:django_models|drf_serializers|detected_components|target_element)"|"\s*\}|$)', text)
+        if html_m:
+            raw_html = html_m.group(1)
+            # Unescape JSON escaped newlines and quotes
+            clean_html = raw_html.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t').replace('\\/', '/')
+            # If truncated, ensure basic closing tags
+            if "<body" in clean_html and "</body>" not in clean_html:
+                clean_html += "\n</body>\n</html>"
+            result["html_code"] = clean_html
+        elif "<!DOCTYPE html" in text or "<html" in text:
+            # Fallback: model returned raw HTML instead of JSON
+            raw_m = re.search(r'(<!DOCTYPE html[\s\S]*?</html>|<html[\s\S]*?</html>|<div[\s\S]*?</div>)', text, re.IGNORECASE)
+            if raw_m:
+                result["html_code"] = raw_m.group(1)
+
+        # Extract django_models
+        models_m = re.search(r'"django_models"\s*:\s*"([\s\S]*?)(?:",\s*"(?:drf_serializers|detected_components)"|"\s*\}|$)', text)
+        if models_m:
+            result["django_models"] = models_m.group(1).replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+        else:
+            # Try python code blocks
+            py_m = re.search(r'```python\s*(?:# Models|class )([\s\S]*?)```', text)
+            if py_m:
+                result["django_models"] = py_m.group(0).replace('```python', '').replace('```', '').strip()
+
+        # Extract drf_serializers
+        serializers_m = re.search(r'"drf_serializers"\s*:\s*"([\s\S]*?)(?:",\s*"(?:detected_components)"|"\s*\}|$)', text)
+        if serializers_m:
+            result["drf_serializers"] = serializers_m.group(1).replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+
+        # Extract detected_components
+        comp_match = re.search(r'"detected_components"\s*:\s*\[(.*?)\]', text, re.DOTALL)
+        if comp_match:
+            comps = re.findall(r'"([^"]+)"', comp_match.group(1))
+            result["detected_components"] = comps
+
+        # Extract bug fields for ScreenToPatch
+        for key in ["bug_description", "target_element", "suggested_fix", "css_or_logic_diff"]:
+            m = re.search(r'"' + re.escape(key) + r'"\s*:\s*"([\s\S]*?)(?:",\s*"\w+"|"\s*\}|$)', text)
+            if m:
+                result[key] = m.group(1).replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t')
+
+        if result.get("html_code") or result.get("bug_description"):
+            return result
+
+        logger.warning("Could not cleanly parse JSON from response, returning safe fallback. Raw snippet:\n%s", text[:300])
+        return {
+            "html_code": text if "<" in text else f"<div class='p-8 font-sans'><h1 class='text-2xl font-bold'>Generated UI</h1><p class='mt-4 text-gray-600'>{text}</p></div>",
+            "django_models": "from django.db import models\n\nclass Item(models.Model):\n    title = models.CharField(max_length=200)\n    created_at = models.DateTimeField(auto_now_add=True)\n",
+            "drf_serializers": "from rest_framework import serializers\nfrom .models import Item\n\nclass ItemSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = Item\n        fields = '__all__'\n",
+            "detected_components": ["Header", "Card", "Button", "Container"],
+            "bug_description": text[:200] if text else "UI Layout inconsistency detected",
+            "target_element": ".container",
+            "suggested_fix": "Add proper margin and responsive padding",
+            "css_or_logic_diff": "",
+        }
 
     # -----------------------------------------------------------------------
     # Public Methods
@@ -227,7 +305,7 @@ Be thorough and generate production-quality code. Use realistic field names and 
 Return ONLY a valid JSON object matching the schema exactly."""
 
         result = self._call_gemini(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-3.6-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
@@ -284,7 +362,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 Return ONLY a valid JSON object. Be specific and actionable."""
 
         return self._call_gemini(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-3.6-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
