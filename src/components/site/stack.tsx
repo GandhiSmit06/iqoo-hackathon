@@ -1,10 +1,11 @@
 "use client";
 import { motion, useInView, useMotionValue, useSpring } from "motion/react";
 import { useEffect, useRef } from "react";
+import { TextReveal } from "./text-reveal";
 
 const STACK = [
   { name: "Django REST", role: "Orchestrator" },
-  { name: "Gemini 1.5 Flash", role: "Vision LLM" },
+  { name: "Gemini 3.6 Flash", role: "Vision LLM" },
   { name: "Whisper", role: "Speech to text" },
   { name: "Tree-sitter", role: "AST search" },
   { name: "PyGithub", role: "PR dispatch" },
@@ -32,7 +33,9 @@ export function Stack() {
     <section className="border-t border-ink">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:py-20">
         <motion.p initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-mono text-label tracking-label uppercase text-muted">Stack · Hardware · Impact</motion.p>
-        <motion.h2 initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.06 }} className="mt-3 font-display text-section font-black uppercase leading-section tracking-section">Built for flagship Android.</motion.h2>
+        <h2 className="mt-3 font-display text-section font-black uppercase leading-section tracking-section">
+          <TextReveal>Built for flagship Android.</TextReveal>
+        </h2>
 
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="mt-10 grid grid-cols-1 border-l border-t border-ink xs:grid-cols-2 sm:grid-cols-4">
           {STACK.map((item, i) => (

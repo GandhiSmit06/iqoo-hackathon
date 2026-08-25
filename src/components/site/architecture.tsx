@@ -1,19 +1,22 @@
 "use client";
 import { motion } from "motion/react";
+import { TextReveal } from "./text-reveal";
 
 const COLS = [
   { kicker: "01 Input", title: "Mobile", items: ["Camera capture", "Screen recording", "Voice memo"] },
   { kicker: "02 Gateway", title: "Django", items: ["REST router", "Celery / Redis", "GitHub OAuth"] },
-  { kicker: "03 Intelligence", title: "Multimodal", items: ["Gemini 1.5 Flash", "Whisper STT", "Tree-sitter AST"] },
+  { kicker: "03 Intelligence", title: "Multimodal", items: ["Gemini 3.6 Flash", "Whisper STT", "Tree-sitter AST"] },
   { kicker: "04 Output", title: "Deliverable", items: ["Live sandbox UI", "Django models", "GitHub pull request"] },
 ];
 
 export function Architecture() {
   return (
-    <section id="architecture" className="border-t border-ink scroll-mt-16">
+    <section id="architecture" className="border-t border-ink scroll-mt-20">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-20">
         <motion.p initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-mono text-label tracking-label uppercase text-muted">04 · Blueprint</motion.p>
-        <motion.h2 initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.06 }} className="mt-3 max-w-3xl font-display text-section font-black uppercase leading-section tracking-section">Dual-engine orchestrator.</motion.h2>
+        <h2 className="mt-3 max-w-3xl font-display text-section font-black uppercase leading-section tracking-section">
+          <TextReveal>Dual-engine orchestrator.</TextReveal>
+        </h2>
         <motion.p initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="mt-4 max-w-2xl text-sm text-muted">A touch-native PWA on the device. A Python intelligence layer behind it. No desktop IDE required to go from paper to a merged patch.</motion.p>
 
         <p className="mt-2 font-mono text-[10px] tracking-label uppercase text-subtle md:hidden">Swipe →</p>

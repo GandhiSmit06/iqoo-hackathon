@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "motion/react";
+import { TextReveal } from "./text-reveal";
 
 const ROWS = [
   { name: "Copilot / Cursor", gap: "Desktop-locked. Cannot ingest paper or a phone screen recording." },
@@ -13,7 +14,9 @@ export function Compare() {
     <section id="compare" className="border-t border-ink">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
         <motion.p initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="font-mono text-label tracking-label uppercase text-muted">Why the wrappers fail</motion.p>
-        <motion.h2 initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.06 }} className="mt-3 font-display text-section font-black uppercase leading-section tracking-section">Not another prompt box.</motion.h2>
+        <h2 className="mt-3 font-display text-section font-black uppercase leading-section tracking-section">
+          <TextReveal>Not another prompt box.</TextReveal>
+        </h2>
         <div className="mt-10 border-t border-ink overflow-hidden">
           {ROWS.map((row, i) => {
             const ours = row.name === "ProtoPatch";

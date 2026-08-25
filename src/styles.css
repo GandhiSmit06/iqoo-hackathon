@@ -73,6 +73,16 @@
     overflow-x: hidden;
   }
 
+  /* Custom cursor — hide default on fine-pointer devices */
+  @media (pointer: fine) {
+    html, body {
+      cursor: none;
+    }
+    a, button, [role="button"], input, textarea, select, label {
+      cursor: none;
+    }
+  }
+
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -273,5 +283,14 @@
 @media (prefers-reduced-motion: reduce) {
   .morph-blob {
     animation: none;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgb(255 68 0 / 0);
+  }
+  50% {
+    box-shadow: 0 0 16px rgb(255 68 0 / 0.35);
   }
 }

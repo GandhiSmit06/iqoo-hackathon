@@ -3,8 +3,10 @@
 import { motion, useScroll, useTransform } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { useRef } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "./button";
 import { useDemo } from "./demo-context";
+import { TextReveal, RevealBlock } from "./text-reveal";
 
 const PILLS = ["Sketch2Stack", "ScreenToPatch", "iQOO Hackathon"];
 
@@ -39,19 +41,15 @@ export function Hero() {
         </motion.div>
 
         <div className="relative mt-8 sm:mt-9">
-          {/* font now matches LAYERED img: Inter Tight heavy, tight tracking, 0.84 leading, not futuristic Syne */}
+          {/* Word-by-word text reveal animation on the hero heading */}
           <h1 className="max-w-full font-display text-display font-black uppercase leading-display tracking-display text-ink">
-            <motion.span initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }} className="block">
-              From Napkin
-            </motion.span>
-            <motion.span
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.52, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2"
-            >
+            <span className="block">
+              <TextReveal delay={0.1} staggerChildren={0.06}>From Napkin</TextReveal>
+            </span>
+            <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
               <span>
-                To Patch<span className="text-accent">.</span>
+                <TextReveal delay={0.25} staggerChildren={0.06}>To Patch</TextReveal>
+                <span className="text-accent">.</span>
               </span>
               <motion.span
                 aria-hidden
@@ -71,43 +69,39 @@ export function Hero() {
                 }}
                 className="size-10 shrink-0 bg-ink sm:size-14 lg:size-[4.2rem]"
               />
-            </motion.span>
+            </span>
           </h1>
           {/* subtle dot system like LABS. in reference */}
           <motion.span initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.58 }} aria-hidden className="absolute right-[18%] top-[56%] hidden size-3 rounded-full bg-accent lg:block" />
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32, duration: 0.4 }} className="mt-10 grid gap-6 border-t border-ink/10 pt-8 sm:mt-12 sm:gap-8 sm:pt-10 lg:grid-cols-12 lg:items-end">
+        <RevealBlock delay={0.4} className="mt-10 grid gap-6 border-t border-ink/10 pt-8 sm:mt-12 sm:gap-8 sm:pt-10 lg:grid-cols-12 lg:items-end">
           <p className="max-w-xl text-sub leading-body text-muted lg:col-span-7">
             Official portal for the multimodal developer engine that turns hand-drawn wireframes into live full-stack apps, and five-second bug recordings into autonomous GitHub pull requests.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row lg:col-span-5 lg:justify-end">
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                size="lg"
-                onClick={() => {
-                  document.getElementById("sketch")?.scrollIntoView({ behavior: "smooth" });
-                  setMode("sketch");
-                }}
-                icon={<ArrowRight className="size-4" />}
-              >
-                Explore engines
-              </Button>
+              <Link to="/sketch">
+                <Button
+                  size="lg"
+                  icon={<ArrowRight className="size-4" />}
+                >
+                  Launch Sketch2Stack
+                </Button>
+              </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => {
-                  document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
-                  play();
-                }}
-              >
-                Mine a patch <span aria-hidden className="ml-1">↗</span>
-              </Button>
+              <Link to="/patch">
+                <Button
+                  size="lg"
+                  variant="outline"
+                >
+                  Launch ScreenToPatch <span aria-hidden className="ml-1">↗</span>
+                </Button>
+              </Link>
             </motion.div>
           </div>
-        </motion.div>
+        </RevealBlock>
       </div>
     </section>
   );

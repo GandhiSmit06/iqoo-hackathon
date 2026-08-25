@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PatchRouteImport } from './routes/patch'
+import { Route as SketchRouteImport } from './routes/sketch'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatchRoute = PatchRouteImport.update({
+  id: '/patch',
+  path: '/patch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SketchRoute = SketchRouteImport.update({
+  id: '/sketch',
+  path: '/sketch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/patch': typeof PatchRoute
+  '/sketch': typeof SketchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/patch': typeof PatchRoute
+  '/sketch': typeof SketchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/patch': typeof PatchRoute
+  '/sketch': typeof SketchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/patch' | '/sketch'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/patch' | '/sketch'
+  id: '__root__' | '/' | '/patch' | '/sketch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PatchRoute: typeof PatchRoute
+  SketchRoute: typeof SketchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patch': {
+      id: '/patch'
+      path: '/patch'
+      fullPath: '/patch'
+      preLoaderRoute: typeof PatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sketch': {
+      id: '/sketch'
+      path: '/sketch'
+      fullPath: '/sketch'
+      preLoaderRoute: typeof SketchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PatchRoute: PatchRoute,
+  SketchRoute: SketchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
