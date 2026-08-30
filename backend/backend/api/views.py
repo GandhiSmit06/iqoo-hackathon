@@ -1,25 +1,35 @@
 """
 ProtoPatch API Views
 
-Two primary pipeline views:
-  - Sketch2StackView   : POST /api/sketch2stack/
-  - ScreenToPatchView  : POST /api/screentopatch/
-  - HealthCheckView    : GET  /api/health/
+Endpoints:
+  - HealthCheckView             : GET  /api/health/
+  - Sketch2StackView            : POST /api/sketch2stack/
+  - Sketch2StackRefineView      : POST /api/sketch2stack/refine/
+  - Sketch2StackExportZipView   : POST /api/sketch2stack/export-zip/
+  - ScreenToPatchView           : POST /api/screentopatch/
 """
 import gc
+import io
 import logging
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView, exception_handler
 
-from .serializers import Sketch2StackInputSerializer, ScreenToPatchInputSerializer
+from .serializers import (
+    Sketch2StackInputSerializer,
+    ProjectRefineSerializer,
+    ProjectExportZipSerializer,
+    ScreenToPatchInputSerializer,
+)
 from .services.vision_service import VisionService
 from .services.audio_service import AudioService
 from .services.ast_engine import ASTEngine
@@ -64,11 +74,7 @@ class Sketch2StackView(APIView):
     """
     POST /api/sketch2stack/
 
-    Pipeline:
-        1. Validate multipart input (image + optional notes)
-        2. Send image to Gemini 1.5 Flash for structured VLM analysis
-        3. Sanitize and wrap HTML output in safe iframe payload
-        4. Return: html_code, django_models, drf_serializers, detected_components, sandbox_html
+    Full-stack multi-file scaffolding from a wireframe sketch.
     """
     parser_classes = [MultiPartParser, FormParser]
 
@@ -84,29 +90,40 @@ class Sketch2StackView(APIView):
         image_file = validated["image"]
         notes = validated.get("notes", "")
         style = validated.get("style", "auto")
+        stack = {
+            "frontend": validated.get("stack_frontend", "react"),
+            "backend": validated.get("stack_backend", "django"),
+            "database": validated.get("stack_database", "postgresql"),
+        }
 
         try:
             image_bytes = image_file.read()
 
-            # --- Step 1: VLM Analysis ---
+            # --- Step 1: VLM Multi-File Analysis ---
             vision = VisionService()
             sketch_result = vision.parse_sketch(
                 image_bytes=image_bytes,
                 mime_type=image_file.content_type or "image/jpeg",
                 notes=notes,
                 style=style,
+                stack=stack,
             )
 
             # --- Step 2: Sandbox HTML Payload ---
             sandbox = SandboxService()
-            sandbox_html = sandbox.build_sandbox_payload(sketch_result["html_code"])
+            raw_html = sketch_result.get("html_code", "")
+            sandbox_html = sandbox.build_sandbox_payload(raw_html)
 
             return Response({
                 "success": True,
-                "html_code": sketch_result["html_code"],
-                "django_models": sketch_result["django_models"],
-                "drf_serializers": sketch_result["drf_serializers"],
-                "detected_components": sketch_result["detected_components"],
+                "project_name": sketch_result.get("project_name", "protopatch-app"),
+                "summary": sketch_result.get("summary", "Full-stack project generated from wireframe sketch."),
+                "stack": stack,
+                "files": sketch_result.get("files", []),
+                "html_code": sketch_result.get("html_code", ""),
+                "django_models": sketch_result.get("django_models", ""),
+                "drf_serializers": sketch_result.get("drf_serializers", ""),
+                "detected_components": sketch_result.get("detected_components", []),
                 "sandbox_html": sandbox_html,
             })
 
@@ -118,17 +135,120 @@ class Sketch2StackView(APIView):
             )
 
 
+class Sketch2StackRefineView(APIView):
+    """
+    POST /api/sketch2stack/refine/
+
+    Conversational AI iteration ('Vibe Coding') loop.
+    Applies incremental modifications to the full-stack multi-file tree.
+    """
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        serializer = ProjectRefineSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "error": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated = serializer.validated_data
+        prompt = validated["prompt"]
+        current_files = validated["current_files"]
+        current_html = validated.get("current_html", "")
+        stack = validated.get("stack", {})
+        history = validated.get("history", [])
+
+        try:
+            vision = VisionService()
+            refine_result = vision.refine_project(
+                prompt=prompt,
+                current_files=current_files,
+                current_html=current_html,
+                stack=stack,
+                history=history,
+            )
+
+            modified_files = refine_result.get("modified_files", [])
+
+            # Merge modified files into full files tree
+            all_files_dict = {f.get("path"): dict(f) for f in current_files}
+            for mod in modified_files:
+                path = mod.get("path")
+                if path:
+                    all_files_dict[path] = mod
+
+            merged_files = list(all_files_dict.values())
+
+            # Update sandbox HTML
+            sandbox = SandboxService()
+            raw_html = refine_result.get("sandbox_html", "") or current_html
+            sandbox_html = sandbox.build_sandbox_payload(raw_html)
+
+            return Response({
+                "success": True,
+                "summary": refine_result.get("summary", f"Applied: '{prompt}'"),
+                "modified_files": modified_files,
+                "all_files": merged_files,
+                "sandbox_html": sandbox_html,
+                "detected_components": refine_result.get("detected_components", []),
+            })
+
+        except Exception as exc:
+            logger.exception("Sketch2Stack refinement error")
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class Sketch2StackExportZipView(APIView):
+    """
+    POST /api/sketch2stack/export-zip/
+
+    Streams a bundled .zip archive containing all project files.
+    """
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        serializer = ProjectExportZipSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "error": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated = serializer.validated_data
+        project_name = validated.get("project_name", "protopatch-app").strip().replace(" ", "-")
+        files = validated["files"]
+
+        try:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                for item in files:
+                    file_path = item.get("path", "").lstrip("/\\")
+                    content = item.get("content", "")
+                    if file_path:
+                        zip_file.writestr(f"{project_name}/{file_path}", content)
+
+            zip_buffer.seek(0)
+            response = HttpResponse(zip_buffer.read(), content_type="application/zip")
+            response["Content-Disposition"] = f'attachment; filename="{project_name}.zip"'
+            return response
+
+        except Exception as exc:
+            logger.exception("Project zip export error")
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ScreenToPatchView(APIView):
     """
     POST /api/screentopatch/
 
-    Pipeline:
-        1. Validate multipart input (video/screenshot + optional audio + repo_url)
-        2. Transcribe audio via Whisper (if provided)
-        3. Extract bug intent from video frames or screenshot via Gemini
-        4. Search target GitHub repo AST for offending component/file
-        5. Synthesize unified diff, create branch, open PR via PyGithub
-        6. Return: bug_description, diff, transcript, pr_url, pr_number
+    Automated bug intent extraction, AST code search, and GitHub PR dispatch.
     """
     parser_classes = [MultiPartParser, FormParser]
 
@@ -177,7 +297,6 @@ class ScreenToPatchView(APIView):
                     transcript = audio_svc.transcribe(audio_path)
                     logger.info("Whisper transcript: %s", transcript[:200])
 
-                # Combine voice transcript with optional text notes
                 full_description = "\n".join(filter(None, [transcript, notes]))
 
                 # --- Step 3: VLM Bug Analysis ---

@@ -546,3 +546,22 @@ class ProductCard extends Component { render() {} }
         self.assertIn('NavBar', names)
         self.assertIn('Header', names)
         self.assertIn('ProductCard', names)
+
+
+class TestProjectExportZipView(TestCase):
+    """Test project zip export endpoint."""
+
+    def test_export_zip_success(self):
+        client = APIClient()
+        payload = {
+            "project_name": "test-app",
+            "files": [
+                {"path": "frontend/App.tsx", "content": "export default function App() {}"},
+                {"path": "backend/main.py", "content": "from fastapi import FastAPI"},
+            ],
+        }
+        response = client.post("/api/sketch2stack/export-zip/", payload, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/zip")
+        self.assertIn("attachment; filename=\"test-app.zip\"", response["Content-Disposition"])
+

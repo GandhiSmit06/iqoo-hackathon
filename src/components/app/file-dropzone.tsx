@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "motion/react";
 import { Upload, Check, Image } from "lucide-react";
-import { useCallback, useState, useRef, type DragEvent, type ChangeEvent } from "react";
+import { useCallback, useState, useRef, useEffect, type DragEvent, type ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
 
 interface FileDropzoneProps {
@@ -12,13 +12,25 @@ interface FileDropzoneProps {
   onFile: (file: File) => void;
   disabled?: boolean;
   preview?: boolean;
+  value?: File | null;
 }
 
-export function FileDropzone({ accept, label, hint, onFile, disabled, preview = true }: FileDropzoneProps) {
+export function FileDropzone({ accept, label, hint, onFile, disabled, preview = true, value }: FileDropzoneProps) {
   const [dragging, setDragging] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(value ?? null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setFile(value);
+      if (value && preview && value.type.startsWith("image/")) {
+        setPreviewUrl(URL.createObjectURL(value));
+      } else if (!value) {
+        setPreviewUrl(null);
+      }
+    }
+  }, [value, preview]);
 
   const handleFile = useCallback(
     (f: File) => {

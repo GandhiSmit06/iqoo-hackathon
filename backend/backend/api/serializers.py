@@ -1,7 +1,6 @@
 """
 ProtoPatch API Serializers
-
-Input validation for both pipeline modes.
+Input validation for multi-file full-stack generation and conversational AI refinement.
 """
 from rest_framework import serializers
 
@@ -9,11 +8,6 @@ from rest_framework import serializers
 class Sketch2StackInputSerializer(serializers.Serializer):
     """
     Input for the Sketch2Stack pipeline.
-
-    Fields:
-        image     — Hand-drawn wireframe photo (JPEG/PNG/WEBP)
-        notes     — Optional text annotations or voice-to-text notes
-        style     — Optional UI style hint (e.g. "dark", "material", "ios")
     """
     image = serializers.ImageField(
         required=True,
@@ -32,18 +26,78 @@ class Sketch2StackInputSerializer(serializers.Serializer):
         default="auto",
         help_text="Target UI style theme.",
     )
+    stack_frontend = serializers.ChoiceField(
+        choices=["react", "nextjs", "vue", "html_tailwind"],
+        required=False,
+        default="react",
+        help_text="Frontend framework choice.",
+    )
+    stack_backend = serializers.ChoiceField(
+        choices=["fastapi", "django", "express_ts", "go_gin"],
+        required=False,
+        default="django",
+        help_text="Backend framework choice.",
+    )
+    stack_database = serializers.ChoiceField(
+        choices=["postgresql", "sqlite", "mongodb"],
+        required=False,
+        default="postgresql",
+        help_text="Database choice.",
+    )
+
+
+class ProjectRefineSerializer(serializers.Serializer):
+    """
+    Input for conversational vibe-coding refinement.
+    """
+    prompt = serializers.CharField(
+        required=True,
+        max_length=4000,
+        help_text="User's natural language modification or feature request.",
+    )
+    current_files = serializers.ListField(
+        child=serializers.DictField(),
+        required=True,
+        help_text="Array of current project files with path and content.",
+    )
+    current_html = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Current live UI HTML content.",
+    )
+    stack = serializers.DictField(
+        required=False,
+        default=dict,
+        help_text="Selected tech stack dictionary.",
+    )
+    history = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list,
+        help_text="Recent conversation history turns.",
+    )
+
+
+class ProjectExportZipSerializer(serializers.Serializer):
+    """
+    Input for streaming ZIP archive export.
+    """
+    project_name = serializers.CharField(
+        required=False,
+        default="protopatch-app",
+        max_length=100,
+    )
+    files = serializers.ListField(
+        child=serializers.DictField(),
+        required=True,
+        help_text="Array of files to bundle into zip.",
+    )
 
 
 class ScreenToPatchInputSerializer(serializers.Serializer):
     """
     Input for the ScreenToPatch pipeline.
-
-    Fields:
-        video      — Screen recording (WebM/MP4, ≤5 seconds ideally)
-        audio      — Voice memo describing the bug (WebM/WAV/MP3, optional)
-        repo_url   — Full GitHub HTTPS URL of the target repository
-        branch     — Target branch name (default: main)
-        notes      — Optional additional bug description text
     """
     video = serializers.FileField(
         required=False,
@@ -84,27 +138,3 @@ class ScreenToPatchInputSerializer(serializers.Serializer):
                 "Either 'video' or 'screenshot' must be provided."
             )
         return attrs
-
-
-# -----------------------------------------------------------------------
-# Output Serializers (for API response documentation)
-# -----------------------------------------------------------------------
-
-class Sketch2StackOutputSerializer(serializers.Serializer):
-    html_code = serializers.CharField()
-    django_models = serializers.CharField()
-    drf_serializers = serializers.CharField()
-    detected_components = serializers.ListField(child=serializers.CharField())
-    sandbox_html = serializers.CharField(help_text="Sanitized self-contained iframe srcdoc HTML.")
-
-
-class ScreenToPatchOutputSerializer(serializers.Serializer):
-    bug_description = serializers.CharField()
-    target_element = serializers.CharField()
-    suggested_fix = serializers.CharField()
-    css_or_logic_diff = serializers.CharField()
-    transcript = serializers.CharField(help_text="Whisper transcription of voice memo.")
-    pr_url = serializers.URLField(allow_blank=True)
-    pr_number = serializers.IntegerField(allow_null=True)
-    branch_name = serializers.CharField()
-    file_matches = serializers.ListField(child=serializers.DictField())

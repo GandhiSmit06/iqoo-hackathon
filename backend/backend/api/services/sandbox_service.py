@@ -1,12 +1,6 @@
 """
 ProtoPatch — Sandbox Service
 Sanitizes arbitrary HTML/JS and wraps it in a safe iframe payload.
-
-Strategy:
-  1. Bleach-sanitize the raw HTML (allow Tailwind classes, data attributes)
-  2. Inject Tailwind CDN if not present
-  3. Add postMessage reload listener for live hot-reload from parent page
-  4. Return self-contained HTML string suitable for <iframe srcdoc="...">
 """
 import html
 import logging
@@ -14,49 +8,21 @@ import re
 
 logger = logging.getLogger(__name__)
 
-# Tags and attributes that are safe in a sandboxed iframe
-ALLOWED_TAGS = [
-    "html", "head", "body", "title", "meta", "link", "style", "script",
-    "div", "span", "section", "article", "header", "footer", "main", "nav", "aside",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "p", "a", "br", "hr", "strong", "em", "b", "i", "u", "s",
-    "ul", "ol", "li", "dl", "dt", "dd",
-    "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-    "form", "input", "button", "textarea", "select", "option", "label",
-    "img", "figure", "figcaption",
-    "pre", "code", "blockquote",
-    "svg", "path", "circle", "rect", "line", "polyline", "polygon",
-]
-
-ALLOWED_ATTRIBUTES = {
-    "*": ["class", "id", "style", "data-*", "aria-*", "role"],
-    "a": ["href", "target", "rel"],
-    "img": ["src", "alt", "width", "height", "loading"],
-    "input": ["type", "name", "value", "placeholder", "checked", "disabled", "required", "min", "max", "step"],
-    "button": ["type", "disabled", "onclick"],
-    "form": ["action", "method", "enctype"],
-    "select": ["name", "multiple"],
-    "option": ["value", "selected"],
-    "textarea": ["name", "rows", "cols", "placeholder"],
-    "meta": ["name", "content", "charset", "viewport"],
-    "link": ["rel", "href", "type"],
-    "script": ["src", "type", "defer", "async"],
-    "svg": ["xmlns", "viewBox", "width", "height", "fill", "stroke"],
-    "path": ["d", "fill", "stroke", "stroke-width"],
-    "circle": ["cx", "cy", "r", "fill", "stroke"],
-    "rect": ["x", "y", "width", "height", "rx", "ry", "fill", "stroke"],
-}
-
 TAILWIND_CDN = '<script src="https://cdn.tailwindcss.com"></script>'
+LUCIDE_CDN = '<script src="https://unpkg.com/lucide@latest"></script>'
 
 POSTMESSAGE_LISTENER = """
 <script>
-  // ProtoPatch live reload bridge
+  // ProtoPatch live reload bridge & icon activator
+  document.addEventListener("DOMContentLoaded", function() {
+    if (window.lucide) { window.lucide.createIcons(); }
+  });
   window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'PP_RELOAD') {
       document.open();
       document.write(event.data.html);
       document.close();
+      if (window.lucide) { window.lucide.createIcons(); }
     }
   });
 </script>
@@ -69,10 +35,14 @@ SANDBOX_WRAPPER = """<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ProtoPatch Preview</title>
   {tailwind_cdn}
+  {lucide_cdn}
   {postmessage_listener}
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-slate-50 min-h-screen text-slate-900 font-sans antialiased">
   {body_content}
+  <script>
+    if (window.lucide) {{ window.lucide.createIcons(); }}
+  </script>
 </body>
 </html>"""
 
@@ -84,70 +54,58 @@ class SandboxService:
 
     def build_sandbox_payload(self, html_code: str) -> str:
         """
-        Process raw HTML from Gemini and return a safe iframe srcdoc string.
-
-        Args:
-            html_code: Raw HTML string from VLM (may include full page or fragment)
-
-        Returns:
-            Complete, sanitized HTML string for iframe srcdoc attribute
+        Process raw HTML and return a safe iframe srcdoc string.
         """
         if not html_code or not html_code.strip():
             return self._empty_payload()
 
-        try:
-            # Attempt bleach sanitization
-            sanitized = self._sanitize_html(html_code)
-        except ImportError:
-            # bleach not installed — trust Gemini output within sandbox
-            logger.warning("bleach not installed — using raw HTML in sandbox")
-            sanitized = html_code
-        except Exception as exc:
-            logger.warning("HTML sanitization failed: %s — using raw HTML", exc)
-            sanitized = html_code
+        cleaned = html_code.strip()
+
+        # Strip markdown fences if present (e.g. ```html ... ```)
+        cleaned = re.sub(r"^```(?:html)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+
+        # Unescape escaped characters if needed
+        if '\\"' in cleaned or '\\n' in cleaned:
+            cleaned = cleaned.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t').replace('\\/', '/')
 
         # Determine if we have a full page or a fragment
-        is_full_page = bool(re.search(r"<html", sanitized, re.IGNORECASE))
+        is_full_page = bool(re.search(r"<html|<head|<body", cleaned, re.IGNORECASE))
 
         if is_full_page:
-            result = self._inject_into_full_page(sanitized)
+            result = self._inject_into_full_page(cleaned)
         else:
-            result = self._wrap_fragment(sanitized)
+            result = self._wrap_fragment(cleaned)
 
         logger.info("Sandbox payload built: %d bytes", len(result))
         return result
 
-    def _sanitize_html(self, html_code: str) -> str:
-        """Use bleach to sanitize HTML, allowing safe tags/attributes."""
-        import bleach
-
-        # bleach.clean strips tags not in allowed list
-        # For Tailwind we need to preserve script tags for CDN loading
-        # So we do a partial sanitization — mainly XSS prevention
-        cleaned = bleach.clean(
-            html_code,
-            tags=ALLOWED_TAGS,
-            attributes=ALLOWED_ATTRIBUTES,
-            strip=True,
-            strip_comments=False,
-        )
-        return cleaned
-
     def _inject_into_full_page(self, full_html: str) -> str:
-        """Inject Tailwind CDN and postMessage listener into an existing full page."""
-        # Add Tailwind if not already present
+        """Inject Tailwind CDN, Lucide, and postMessage listener into an existing full page."""
+        # Ensure Tailwind CDN
         if "cdn.tailwindcss.com" not in full_html:
-            full_html = full_html.replace("</head>", f"{TAILWIND_CDN}\n</head>", 1)
-            if "</head>" not in full_html:
-                full_html = TAILWIND_CDN + "\n" + full_html
+            if "<head>" in full_html:
+                full_html = full_html.replace("<head>", f"<head>\n  {TAILWIND_CDN}\n  {LUCIDE_CDN}", 1)
+            elif "</head>" in full_html:
+                full_html = full_html.replace("</head>", f"  {TAILWIND_CDN}\n  {LUCIDE_CDN}\n</head>", 1)
+            else:
+                full_html = f"{TAILWIND_CDN}\n{LUCIDE_CDN}\n" + full_html
 
-        # Add postMessage listener before </body>
+        # Ensure Lucide CDN
+        if "unpkg.com/lucide" not in full_html:
+            if "</head>" in full_html:
+                full_html = full_html.replace("</head>", f"  {LUCIDE_CDN}\n</head>", 1)
+
+        # Add postMessage listener and lucide trigger before </body>
         if "PP_RELOAD" not in full_html:
-            full_html = full_html.replace(
-                "</body>",
-                f"{POSTMESSAGE_LISTENER}\n</body>",
-                1
-            )
+            if "</body>" in full_html:
+                full_html = full_html.replace(
+                    "</body>",
+                    f"{POSTMESSAGE_LISTENER}\n<script>if (window.lucide) {{ window.lucide.createIcons(); }}</script>\n</body>",
+                    1
+                )
+            else:
+                full_html += f"\n{POSTMESSAGE_LISTENER}\n<script>if (window.lucide) {{ window.lucide.createIcons(); }}</script>"
 
         return full_html
 
@@ -155,6 +113,7 @@ class SandboxService:
         """Wrap an HTML fragment in a full page template."""
         return SANDBOX_WRAPPER.format(
             tailwind_cdn=TAILWIND_CDN,
+            lucide_cdn=LUCIDE_CDN,
             postmessage_listener=POSTMESSAGE_LISTENER,
             body_content=fragment,
         )
@@ -163,6 +122,7 @@ class SandboxService:
         """Return a placeholder payload when no HTML was generated."""
         return SANDBOX_WRAPPER.format(
             tailwind_cdn=TAILWIND_CDN,
+            lucide_cdn=LUCIDE_CDN,
             postmessage_listener=POSTMESSAGE_LISTENER,
             body_content="""
             <div class="flex items-center justify-center min-h-screen">

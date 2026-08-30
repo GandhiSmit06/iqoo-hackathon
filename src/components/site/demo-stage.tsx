@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Play, RotateCcw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 import { useDemo } from "./demo-context";
 import { PhoneFrame } from "./phone-frame";
+import { IqooHomeScreen } from "./iqoo-home-screen";
 import { PatchScreen } from "./patch-screen";
 import { SketchScreen } from "./sketch-screen";
 
@@ -29,10 +31,32 @@ const PATCH_STEPS = [
 export function DemoStage() {
   const { mode, setMode, play, reset, running, sketchPhase, patchPhase, jumpTo } =
     useDemo();
+  const [appOpen, setAppOpen] = useState(false);
+
   const steps = mode === "sketch" ? SKETCH_STEPS : PATCH_STEPS;
   const phase = mode === "sketch" ? sketchPhase : patchPhase;
   const activeIndex = steps.findIndex((s) => s.id === phase);
   const progress = phase === "idle" ? 0 : activeIndex === -1 ? 100 : ((activeIndex + 1) / steps.length) * 100;
+
+  const handlePlaySequence = () => {
+    setAppOpen(true);
+    play();
+  };
+
+  const handleModeSwitch = (m: "sketch" | "patch") => {
+    setMode(m);
+    setAppOpen(true);
+  };
+
+  const handleJumpTo = (stepId: string) => {
+    setAppOpen(true);
+    jumpTo(stepId as any);
+  };
+
+  const handleReset = () => {
+    reset();
+    setAppOpen(false);
+  };
 
   return (
     <section id="demo" className="border-t border-ink scroll-mt-16">
@@ -45,12 +69,12 @@ export function DemoStage() {
               Run it on the device.
             </h2>
             <p className="mt-4 max-w-md text-sm text-muted">
-              Switch modes, then play the pipeline. The phone is a working prototype — drag it to switch, scrub the timeline.
+              Tap <strong>&ldquo;Try the APP&rdquo;</strong> on the iQOO display to launch the dual-engine studio, or control the sequence below.
             </p>
 
             <div className="mt-8 flex flex-col border border-ink overflow-hidden lg:flex-col">
-              <ModeBtn active={mode === "sketch"} onClick={() => setMode("sketch")} kicker="Mode 01" label="Sketch2Stack" />
-              <ModeBtn active={mode === "patch"} onClick={() => setMode("patch")} kicker="Mode 02" label="ScreenToPatch" />
+              <ModeBtn active={mode === "sketch"} onClick={() => handleModeSwitch("sketch")} kicker="Mode 01" label="Sketch2Stack" />
+              <ModeBtn active={mode === "patch"} onClick={() => handleModeSwitch("patch")} kicker="Mode 02" label="ScreenToPatch" />
             </div>
 
             {/* scrubbable timeline */}
@@ -79,7 +103,7 @@ export function DemoStage() {
                       <button
                         type="button"
                         aria-label={`Jump to ${step.label}`}
-                        onClick={() => jumpTo(step.id)}
+                        onClick={() => handleJumpTo(step.id)}
                         className={cn(
                           "flex w-full cursor-pointer items-center justify-between px-3 py-2.5 text-left border-t border-ink/5 first:border-t-0 transition-colors",
                           state === "now" && "bg-ink text-paper",
@@ -111,37 +135,51 @@ export function DemoStage() {
 
             <div className="mt-5 flex gap-2">
               <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
-                <Button onClick={() => play()} disabled={running} icon={<Play className="size-3.5 fill-current" />} className="w-full justify-center">
+                <Button onClick={handlePlaySequence} disabled={running} icon={<Play className="size-3.5 fill-current" />} className="w-full justify-center">
                   {running ? "Running" : "Play sequence"}
                 </Button>
               </motion.div>
-              <Button variant="outline" onClick={reset} icon={<RotateCcw className="size-3.5" />}>
+              <Button variant="outline" onClick={handleReset} icon={<RotateCcw className="size-3.5" />}>
                 Reset
               </Button>
             </div>
             <p className="mt-3 flex items-center gap-1 font-mono text-[10px] tracking-wide uppercase text-subtle">
-              <Sparkles className="size-3" /> Tap shutter / mic on device
+              <Sparkles className="size-3" /> Tap &ldquo;Try the APP&rdquo; on iQOO Phone
             </p>
           </div>
 
-          {/* phone - FIXED CENTER, PRESERVED */}
+          {/* iQOO Phone 3D Device Container */}
           <div className="flex items-center justify-center py-2 lg:col-span-5 lg:sticky lg:top-[88px]">
             <PhoneFrame
-              onSwipeLeft={() => setMode("patch")}
-              onSwipeRight={() => setMode("sketch")}
+              onSwipeLeft={() => handleModeSwitch("patch")}
+              onSwipeRight={() => handleModeSwitch("sketch")}
+              isAppOpen={appOpen}
+              onExitApp={() => setAppOpen(false)}
             >
-              <AnimatePresence mode="popLayout">
-                <motion.div
-                  key={mode}
-                  layout
-                  initial={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 1.02, filter: "blur(8px)" }}
-                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                  className="h-full"
-                >
-                  {mode === "sketch" ? <SketchScreen /> : <PatchScreen />}
-                </motion.div>
+              <AnimatePresence mode="wait">
+                {!appOpen ? (
+                  <motion.div
+                    key="iqoo-home"
+                    initial={{ opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.08, filter: "blur(6px)" }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="h-full w-full"
+                  >
+                    <IqooHomeScreen onLaunchApp={() => setAppOpen(true)} />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={mode}
+                    initial={{ opacity: 0, scale: 0.88, filter: "blur(10px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, scale: 0.94, filter: "blur(6px)" }}
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                    className="h-full"
+                  >
+                    {mode === "sketch" ? <SketchScreen /> : <PatchScreen />}
+                  </motion.div>
+                )}
               </AnimatePresence>
             </PhoneFrame>
           </div>
@@ -220,7 +258,7 @@ function MobileOutput() {
 
 function SketchLog({ phase, tab, onTab }: { phase: string; tab: string; onTab: (t: "ui" | "models" | "api") => void }) {
   if (phase === "idle") {
-    return <p className="text-code-fg/60">Point the camera at a paper wireframe. Tap the shutter on the device or play the sequence. Drag phone to morph.</p>;
+    return <p className="text-code-fg/60">Point the camera at a paper wireframe. Tap &ldquo;Try the APP&rdquo; on the device or play the sequence.</p>;
   }
   if (phase === "preview") {
     return (
