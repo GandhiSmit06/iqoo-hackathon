@@ -69,7 +69,7 @@ export function DemoStage() {
               Run it on the device.
             </h2>
             <p className="mt-4 max-w-md text-sm text-muted">
-              Tap <strong>&ldquo;Try the APP&rdquo;</strong> on the iQOO display to launch the dual-engine studio, or control the sequence below.
+              Tap the <strong>&ldquo;ProtoPatch Studio&rdquo;</strong> widget on the iQOO display to launch the live engine, or control the pipeline sequence below.
             </p>
 
             <div className="mt-8 flex flex-col border border-ink overflow-hidden lg:flex-col">
@@ -144,7 +144,7 @@ export function DemoStage() {
               </Button>
             </div>
             <p className="mt-3 flex items-center gap-1 font-mono text-[10px] tracking-wide uppercase text-subtle">
-              <Sparkles className="size-3" /> Tap &ldquo;Try the APP&rdquo; on iQOO Phone
+              <Sparkles className="size-3 text-accent" /> Tap ProtoPatch Studio on iQOO display
             </p>
           </div>
 
@@ -166,7 +166,12 @@ export function DemoStage() {
                     transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                     className="h-full w-full"
                   >
-                    <IqooHomeScreen onLaunchApp={() => setAppOpen(true)} />
+                    <IqooHomeScreen
+                      onLaunchApp={(targetMode) => {
+                        if (targetMode) handleModeSwitch(targetMode);
+                        setAppOpen(true);
+                      }}
+                    />
                   </motion.div>
                 ) : (
                   <motion.div

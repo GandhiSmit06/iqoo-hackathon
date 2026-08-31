@@ -139,7 +139,7 @@ export function PhoneFrame({
           {/* BACK FACE (Authentic iQOO Chassis with Camera & Logo)     */}
           {/* ========================================================= */}
           <div
-            className="absolute inset-0 overflow-hidden rounded-phone bg-white border border-slate-300 shadow-2xl"
+            className="absolute inset-0 overflow-hidden rounded-phone shadow-2xl"
             style={{
               backfaceVisibility: "hidden",
               WebkitBackfaceVisibility: "hidden",
@@ -150,11 +150,11 @@ export function PhoneFrame({
             <img
               src="/iqoo-back.png"
               alt="iQOO Back Edition"
-              className="h-full w-full object-cover pointer-events-none"
+              className="h-full w-full object-cover pointer-events-none select-none"
             />
 
             {/* Glossy highlight layer */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/40 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/25 pointer-events-none rounded-phone" />
 
             {/* Click to Flip Front badge */}
             <button
