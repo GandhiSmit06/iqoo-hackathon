@@ -84,7 +84,10 @@ export type StyleOption = "auto" | "dark" | "light" | "material" | "ios" | "mini
 // API Client
 // ---------------------------------------------------------------------------
 
-const API_BASE = "/api";
+const API_BASE =
+  typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL
+    ? `${String(import.meta.env.VITE_API_URL).replace(/\/+$/, "")}/api`
+    : "/api";
 
 class ApiError extends Error {
   status: number;

@@ -20,10 +20,14 @@ SECRET_KEY = os.environ.get(
 )
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.environ.get(
-    "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1,0.0.0.0"
-).split(",")
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        "*"
+    ).split(",")
+    if h.strip()
+]
 
 # -----------------------------------------------------------------------
 # Applications
@@ -78,7 +82,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # -----------------------------------------------------------------------
 # CORS — Allow frontend dev server and LAN mobile devices
 # -----------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Permissive in dev mode
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1", "yes")
 CORS_ALLOWED_ORIGINS = [
     o.strip()
     for o in os.environ.get(
