@@ -108,7 +108,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     response = await fetch(`${API_BASE}${url}`, options);
   } catch (err) {
     throw new ApiError(
-      `Unable to connect to backend server. Make sure Django is running on port 8000 (run 'npm run dev:backend').`,
+      `Unable to connect to backend server (${API_BASE}). If on cloud, the backend may be taking a moment to start. (${err instanceof Error ? err.message : String(err)})`,
       0,
     );
   }

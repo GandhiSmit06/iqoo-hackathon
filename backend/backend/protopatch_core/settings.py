@@ -79,26 +79,27 @@ STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.vercel.app",
+    "https://*.onrender.com",
+    "http://localhost:8080",
+    "http://localhost:3000",
+]
+
 # -----------------------------------------------------------------------
 # CORS — Allow frontend dev server and LAN mobile devices
 # -----------------------------------------------------------------------
+from corsheaders.defaults import default_headers
+
 CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "True").lower() in ("true", "1", "yes")
-CORS_ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.environ.get(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000"
-    ).split(",")
-    if o.strip()
-]
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "origin",
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-requested-with",
+    "content-type",
+    "authorization",
+    "accept",
+    "origin",
 ]
 
 # -----------------------------------------------------------------------
