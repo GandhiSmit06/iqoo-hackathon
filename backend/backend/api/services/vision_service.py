@@ -423,7 +423,8 @@ Carefully inspect the uploaded image:
 CRITICAL MULTI-FILE & LIVE PREVIEW REQUIREMENTS (When `is_valid_sketch` is true):
 1. `html_code`: A COMPLETE, self-contained interactive single-page HTML application with:
    - <script src="https://cdn.tailwindcss.com"></script>
-   - Realistic sample data, full UI components matching the sketch, and functional client-side mock interactivity (tabs, filters, state toggles, modal dialogs).
+   - Realistic sample data, full UI components matching the sketch, and functional client-side mock interactivity (tabs, filters, search input, slide carousels, modal dialogs).
+   - Use `<button>` or `<a href="javascript:void(0)">` with client-side JavaScript `onclick` handlers for all tabs/buttons/links so clicking them switches tabs or toggles state smoothly without reloading or navigating away.
 
 2. `files`: Generate a comprehensive multi-file repository (6 to 10 files) that DIRECTLY IMPLEMENTS the application shown in `html_code`:
    - Frontend files (e.g. `frontend/src/App.tsx`, `frontend/src/components/...` or `frontend/index.html`) MUST contain the actual full component code, styling, and state hooks implementing the UI seen in `html_code`.

@@ -13,18 +13,64 @@ LUCIDE_CDN = '<script src="https://unpkg.com/lucide@latest"></script>'
 
 POSTMESSAGE_LISTENER = """
 <script>
-  // ProtoPatch live reload bridge & icon activator
-  document.addEventListener("DOMContentLoaded", function() {
-    if (window.lucide) { window.lucide.createIcons(); }
-  });
-  window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'PP_RELOAD') {
-      document.open();
-      document.write(event.data.html);
-      document.close();
-      if (window.lucide) { window.lucide.createIcons(); }
+  // ProtoPatch Sandbox Protection & Interactive Navigation Guard
+  (function() {
+    function setupSandboxGuard() {
+      if (window.lucide) {
+        try { window.lucide.createIcons(); } catch (err) {}
+      }
+
+      // 1. Intercept all link clicks so they never navigate away from the sandbox preview
+      document.addEventListener("click", function(e) {
+        const link = e.target.closest("a");
+        if (link) {
+          e.preventDefault();
+          e.stopPropagation();
+          const href = link.getAttribute("href") || "";
+          console.log("[ProtoPatch Sandbox] Link click intercepted:", href);
+          // If it is an anchor hash on the same page, scroll to it smoothly
+          if (href.startsWith("#") && href.length > 1) {
+            try {
+              const target = document.querySelector(href);
+              if (target) {
+                target.scrollIntoView({ behavior: "smooth" });
+              }
+            } catch (err) {}
+          }
+        }
+      }, true);
+
+      // 2. Intercept all form submissions so they don't reload or navigate away
+      document.addEventListener("submit", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("[ProtoPatch Sandbox] Form submission intercepted and handled locally");
+      }, true);
+
+      // 3. Block window.open and top-level navigation
+      try {
+        window.open = function(url) {
+          console.warn("[ProtoPatch Sandbox] Blocked external window.open to:", url);
+          return null;
+        };
+      } catch (err) {}
     }
-  });
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", setupSandboxGuard);
+    } else {
+      setupSandboxGuard();
+    }
+
+    window.addEventListener("message", function(event) {
+      if (event.data && event.data.type === "PP_RELOAD") {
+        document.open();
+        document.write(event.data.html);
+        document.close();
+        setupSandboxGuard();
+      }
+    });
+  })();
 </script>
 """
 
