@@ -117,7 +117,7 @@ class AudioService:
             if not settings.GEMINI_API_KEY:
                 return None
 
-            for model_name in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest"]:
+            for model_name in ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest"]:
                 try:
                     model = genai.GenerativeModel(model_name)
                     response = model.generate_content([

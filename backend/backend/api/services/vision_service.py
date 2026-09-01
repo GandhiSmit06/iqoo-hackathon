@@ -196,7 +196,7 @@ class VisionService:
         """
         genai = self._get_client()
 
-        candidate_models = [model_name, "gemini-3.6-flash", "gemini-flash-latest", "gemini-3-flash-preview"]
+        candidate_models = [model_name, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest"]
         candidate_models = list(dict.fromkeys(candidate_models))
 
         content_parts = [prompt]
@@ -224,7 +224,9 @@ class VisionService:
                     raw_text = "".join(p.text for p in response.candidates[0].content.parts if hasattr(p, "text"))
                 else:
                     raw_text = response.text.strip()
-                return self._extract_json(raw_text)
+                extracted = self._extract_json(raw_text)
+                if extracted and isinstance(extracted, dict):
+                    return extracted
             except Exception as exc:
                 last_exc = exc
                 logger.warning("Gemini model %s failed: %s — trying fallback", m_name, exc)
@@ -238,12 +240,21 @@ class VisionService:
                         raw_text = "".join(p.text for p in response.candidates[0].content.parts if hasattr(p, "text"))
                     else:
                         raw_text = response.text.strip()
-                    return self._extract_json(raw_text)
+                    extracted = self._extract_json(raw_text)
+                    if extracted and isinstance(extracted, dict):
+                        return extracted
                 except Exception as exc2:
                     logger.warning("Gemini model %s fallback without schema failed: %s", m_name, exc2)
                     continue
 
         logger.error("All Gemini candidate models failed: %s", last_exc)
+        if last_exc:
+            error_str = str(last_exc)
+            if "429" in error_str or "quota" in error_str.lower():
+                raise RuntimeError(
+                    "Gemini API rate limit or quota exceeded on free tier. Please wait a few seconds before retrying."
+                )
+            raise RuntimeError(f"AI Generation Failed: {error_str}")
         return {}
 
     def _extract_json(self, text: str) -> dict:
@@ -422,7 +433,7 @@ CRITICAL MULTI-FILE & LIVE PREVIEW REQUIREMENTS (When `is_valid_sketch` is true)
 Return ONLY a valid JSON object matching the schema."""
 
         result = self._call_gemini(
-            model_name="gemini-3.6-flash",
+            model_name="gemini-3.5-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
@@ -531,7 +542,7 @@ CRITICAL REQUIREMENTS:
 Return ONLY a valid JSON object matching the REFINE_SCHEMA."""
 
         result = self._call_gemini(
-            model_name="gemini-3.6-flash",
+            model_name="gemini-3.5-flash",
             prompt=refine_prompt,
             schema=REFINE_SCHEMA,
         )
@@ -671,7 +682,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 Return ONLY a valid JSON object."""
 
         return self._call_gemini(
-            model_name="gemini-3.6-flash",
+            model_name="gemini-3.5-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
