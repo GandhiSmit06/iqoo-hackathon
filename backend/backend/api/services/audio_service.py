@@ -117,30 +117,22 @@ class AudioService:
             if not settings.GEMINI_API_KEY:
                 return None
 
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-3.6-flash")
+            for model_name in ["gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest"]:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response = model.generate_content([
+                        "Transcribe this audio recording verbatim. "
+                        "Return ONLY the transcription text, nothing else.",
+                        {"mime_type": mime_type, "data": audio_bytes},
+                    ])
+                    transcript = response.text.strip()
+                    logger.info("Gemini audio transcription (%s): %d chars", model_name, len(transcript))
+                    return transcript
+                except Exception as model_err:
+                    logger.warning("Gemini model %s audio transcription failed: %s", model_name, model_err)
+                    continue
 
-            audio_bytes = audio_path.read_bytes()
-            suffix = audio_path.suffix.lower()
-            mime_map = {
-                ".webm": "audio/webm",
-                ".wav": "audio/wav",
-                ".mp3": "audio/mpeg",
-                ".ogg": "audio/ogg",
-                ".m4a": "audio/mp4",
-                ".aac": "audio/aac",
-            }
-            mime_type = mime_map.get(suffix, "audio/webm")
-
-            response = model.generate_content([
-                "Transcribe this audio recording verbatim. "
-                "Return ONLY the transcription text, nothing else.",
-                {"mime_type": mime_type, "data": audio_bytes},
-            ])
-
-            transcript = response.text.strip()
-            logger.info("Gemini audio transcription: %d chars", len(transcript))
-            return transcript
+            return None
 
         except Exception as exc:
             logger.warning("Gemini audio transcription failed: %s", exc)

@@ -100,18 +100,46 @@ class ApiError extends Error {
 export { ApiError };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, options);
-  const data = await response.json();
-  if (!response.ok || data.success === false) {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${url}`, options);
+  } catch (err) {
     throw new ApiError(
-      data.error
+      `Unable to connect to backend server. Make sure Django is running on port 8000 (run 'npm run dev:backend').`,
+      0,
+    );
+  }
+
+  let data: any;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+  } else {
+    const text = await response.text().catch(() => "");
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = {
+        error:
+          response.status === 504 || response.status === 502
+            ? "Backend API server is unreachable (504/502). Please start Django server using 'npm run dev:backend'."
+            : text || `Request failed with HTTP status ${response.status}`,
+      };
+    }
+  }
+
+  if (!response.ok || !data || data.success === false) {
+    const errorMsg =
+      data?.error
         ? typeof data.error === "string"
           ? data.error
           : JSON.stringify(data.error)
-        : `Request failed (${response.status})`,
-      response.status,
-      data,
-    );
+        : `Request failed (HTTP ${response.status}). Backend server might be offline or encountering an issue.`;
+    throw new ApiError(errorMsg, response.status, data);
   }
   return data as T;
 }

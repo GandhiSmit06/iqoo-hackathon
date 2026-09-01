@@ -1,0 +1,10 @@
+{
+  "name": "protopatch-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ProtoPatch Django AI Backend",
+  "scripts": {
+    "dev": "node run-backend.js",
+    "start": "node run-backend.js"
+  }
+}
