@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 SKETCH2STACK_SCHEMA = {
     "type": "object",
     "properties": {
+        "is_valid_sketch": {
+            "type": "boolean",
+            "description": "True if the image is a UI wireframe, hand-drawn sketch, architecture diagram, flowchart, screen layout, or UI mockup. False if it is a random photo (person portrait/selfie, landscape, object, animal, food, etc.) without interface design elements."
+        },
+        "image_classification": {
+            "type": "string",
+            "description": "Short classification of what the image is (e.g. 'Hand-drawn UI Wireframe', 'System Architecture Diagram', 'Personal Portrait / Photo', 'Landscape Photograph')"
+        },
+        "rejection_reason": {
+            "type": "string",
+            "description": "If is_valid_sketch is false, a friendly explanation explaining what the image depicts and asking the user to upload a wireframe or UI design sketch instead. If is_valid_sketch is true, this should be empty."
+        },
         "project_name": {
             "type": "string",
             "description": "Short lowercase kebab-case project identifier (e.g. 'storefront-app')"
@@ -73,7 +85,7 @@ SKETCH2STACK_SCHEMA = {
             "description": "List of detected UI component names (e.g. ['NavBar', 'HeroCard', 'DataTable'])"
         }
     },
-    "required": ["project_name", "summary", "html_code", "django_models", "drf_serializers", "files", "detected_components"]
+    "required": ["is_valid_sketch", "image_classification", "rejection_reason", "project_name", "summary", "html_code", "django_models", "drf_serializers", "files", "detected_components"]
 }
 
 REFINE_SCHEMA = {
@@ -363,13 +375,34 @@ TARGET TECH STACK:
 - Database: {database_choice.upper()} (production schema, migrations/ORM models)
 """
 
-        prompt = f"""You are a World-Class Full-Stack Architect and Principal Engineer.
-Analyze this hand-drawn wireframe sketch or system architecture diagram and generate a complete, production-grade, multi-file full-stack project.
+        prompt = f"""You are a World-Class Full-Stack Architect and Principal Engineer for ProtoPatch.
+
+STEP 1 — VISUAL VALIDATION:
+Carefully inspect the uploaded image:
+- Is this image a user interface (UI) wireframe, hand-drawn interface sketch, app screen mockup, software flowchart, or system architecture diagram?
+- If NO (e.g. it is a personal portrait/selfie, photo of a person, nature landscape, animal, food, vehicle, or random real-world photo with NO software interface or system diagram design):
+  - Set `is_valid_sketch`: false
+  - Set `image_classification`: Describe what is in the photo (e.g. "Personal portrait / photograph", "Nature landscape photo", etc.)
+  - Set `rejection_reason`: "The uploaded image appears to be a " + image_classification + " rather than a UI wireframe or design sketch. Please upload a hand-drawn sketch, digital wireframe, or app screen."
+  - Set `project_name`: "none"
+  - Set `summary`: "Non-wireframe image detected."
+  - Set `html_code`: ""
+  - Set `django_models`: ""
+  - Set `drf_serializers`: ""
+  - Set `files`: []
+  - Set `detected_components`: []
+  - Return the JSON immediately.
+
+- If YES (it is a hand-drawn sketch, napkin wireframe, digital UI mockup, software diagram, or screen layout):
+  - Set `is_valid_sketch`: true
+  - Set `image_classification`: "UI Wireframe Sketch"
+  - Set `rejection_reason`: ""
+  - Proceed with generating the full-stack architecture below.
 
 {style_hint}{notes_hint}
 {stack_instructions}
 
-CRITICAL MULTI-FILE & LIVE PREVIEW REQUIREMENTS:
+CRITICAL MULTI-FILE & LIVE PREVIEW REQUIREMENTS (When `is_valid_sketch` is true):
 1. `html_code`: A COMPLETE, self-contained interactive single-page HTML application with:
    - <script src="https://cdn.tailwindcss.com"></script>
    - Realistic sample data, full UI components matching the sketch, and functional client-side mock interactivity (tabs, filters, state toggles, modal dialogs).
@@ -397,6 +430,13 @@ Return ONLY a valid JSON object matching the schema."""
         )
 
         # Fallbacks and normalization
+        if result.get("is_valid_sketch") is False:
+            result.setdefault("rejection_reason", "The uploaded image does not appear to be a UI wireframe or design sketch. Please upload a hand-drawn sketch or interface mockup.")
+            return result
+
+        result.setdefault("is_valid_sketch", True)
+        result.setdefault("image_classification", "UI Wireframe Sketch")
+        result.setdefault("rejection_reason", "")
         result.setdefault("project_name", "protopatch-app")
         result.setdefault("summary", "Full-stack application generated from wireframe sketch.")
         result.setdefault("html_code", "<html><body class='p-8 font-sans'><h1 class='text-2xl font-bold'>Generated UI</h1></body></html>")

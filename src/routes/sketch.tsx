@@ -418,10 +418,15 @@ function SketchPage() {
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="border border-danger/30 bg-danger/5 p-4"
+                className="border border-danger/40 bg-danger/5 p-4 rounded-sm"
               >
-                <p className="font-mono text-label tracking-label uppercase text-danger">Error</p>
-                <p className="mt-1 text-sm text-danger/80">{error}</p>
+                <p className="font-mono text-label tracking-label uppercase text-danger font-bold">
+                  Image Validation / Error
+                </p>
+                <p className="mt-1 text-sm text-danger/90 leading-relaxed">{error}</p>
+                <p className="mt-2 text-xs text-muted font-mono border-t border-danger/15 pt-2">
+                  💡 Tip: Sketch2Stack is designed for hand-drawn sketches, napkin wireframes, UI diagrams, or screen mockups.
+                </p>
               </motion.div>
             )}
           </div>

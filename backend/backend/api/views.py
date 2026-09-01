@@ -109,6 +109,21 @@ class Sketch2StackView(APIView):
                 stack=stack,
             )
 
+            if sketch_result.get("is_valid_sketch") is False:
+                rejection_msg = sketch_result.get("rejection_reason") or (
+                    f"The uploaded image appears to be a {sketch_result.get('image_classification', 'photograph')} "
+                    "rather than a UI wireframe or design sketch. Please upload a hand-drawn sketch, digital wireframe, or app screen."
+                )
+                return Response(
+                    {
+                        "success": False,
+                        "is_valid_sketch": False,
+                        "image_classification": sketch_result.get("image_classification", "Non-wireframe photo"),
+                        "error": rejection_msg,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             # --- Step 2: Sandbox HTML Payload ---
             sandbox = SandboxService()
             raw_html = sketch_result.get("html_code", "")
