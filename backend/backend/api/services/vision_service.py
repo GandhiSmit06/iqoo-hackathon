@@ -196,7 +196,14 @@ class VisionService:
         """
         genai = self._get_client()
 
-        candidate_models = [model_name, "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest"]
+        candidate_models = [
+            model_name,
+            "gemini-3.6-flash",
+            "gemini-flash-latest",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-pro-latest",
+        ]
         candidate_models = list(dict.fromkeys(candidate_models))
 
         content_parts = [prompt]
@@ -433,7 +440,7 @@ CRITICAL MULTI-FILE & LIVE PREVIEW REQUIREMENTS (When `is_valid_sketch` is true)
 Return ONLY a valid JSON object matching the schema."""
 
         result = self._call_gemini(
-            model_name="gemini-3.5-flash",
+            model_name="gemini-3.6-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
@@ -542,7 +549,7 @@ CRITICAL REQUIREMENTS:
 Return ONLY a valid JSON object matching the REFINE_SCHEMA."""
 
         result = self._call_gemini(
-            model_name="gemini-3.5-flash",
+            model_name="gemini-3.6-flash",
             prompt=refine_prompt,
             schema=REFINE_SCHEMA,
         )
@@ -682,7 +689,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 Return ONLY a valid JSON object."""
 
         return self._call_gemini(
-            model_name="gemini-3.5-flash",
+            model_name="gemini-3.6-flash",
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
